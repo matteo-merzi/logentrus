@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
+	"io"
 )
 
 // Hook used to send logs to logentries
@@ -20,6 +21,7 @@ type Hook struct {
 	network   string
 	port      int
 	tlsConfig *tls.Config
+	writer io.WriteCloser
 }
 
 // Opts is a set of optional parameters for NewEncrytpedHook
@@ -88,10 +90,11 @@ func New(token string, options *Opts) (hook *Hook, err error) {
 			}
 		}
 
-		// Test connection
-		if conn, err := hook.dial(); err == nil {
-			conn.Close()
+		conn, err := hook.dial()
+		if err != nil {
+			return nil, err
 		}
+		hook.writer = conn
 	}
 	return
 }
@@ -116,6 +119,10 @@ func (hook *Hook) Fire(entry *logrus.Entry) (err error) {
 	return
 }
 
+func (hook Hook) CloseConnection() error {
+	return hook.writer.Close()
+}
+
 // dial establishes a new connection which caller is responsible for closing
 func (hook Hook) dial() (net.Conn, error) {
 	if hook.encrypt {
@@ -126,10 +133,11 @@ func (hook Hook) dial() (net.Conn, error) {
 
 // write dials a connection and writes token and line in bytes to connection
 func (hook *Hook) write(line string) (err error) {
-	if conn, err := hook.dial(); err == nil {
-		defer conn.Close()
-		_, err = conn.Write([]byte(hook.token + line))
-	}
+	_, err =  hook.writer.Write([]byte(hook.token + line))
+	//if conn, err := hook.dial(); err == nil {
+	//	defer conn.Close()
+	//	_, err = conn.Write([]byte(hook.token + line))
+	//}
 	return
 }
 
@@ -142,3 +150,4 @@ func (hook Hook) format(entry *logrus.Entry) (string, error) {
 	str := string(serialized)
 	return str, nil
 }
+
