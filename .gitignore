@@ -26,4 +26,4 @@ _testmain.go
 setVars.sh
 
 #jetbrains Goland
-.idea
+.idea/
